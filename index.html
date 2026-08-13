@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hospital Network — SQL Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F2E9;
+    --paper-card:#FCFAF4;
+    --ink:#1E2A2A;
+    --ink-soft:#4A5A58;
+    --teal:#2F6F63;
+    --teal-deep:#1F4E45;
+    --rust:#B3492E;
+    --line:#DAD3BE;
+    --line-soft:#E8E2D0;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    line-height:1.55;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px;}
+
+  /* ---- Chart header ---- */
+  header{
+    border-bottom:2px solid var(--ink);
+    padding:28px 0 18px;
+  }
+  .chart-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .chart-meta .id{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:clamp(28px,4.2vw,44px);
+    margin:6px 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .subhead{
+    font-size:15px;
+    color:var(--ink-soft);
+    max-width:640px;
+  }
+  .fields{
+    display:flex;
+    gap:28px;
+    margin-top:18px;
+    flex-wrap:wrap;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .fields span b{color:var(--ink);font-weight:600;}
+
+  /* ---- Hero stat row ---- */
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin:26px 0;
+  }
+  .stat{
+    background:var(--paper-card);
+    padding:22px 20px;
+  }
+  .stat .num{
+    font-family:'Source Serif 4', serif;
+    font-weight:700;
+    font-size:32px;
+    color:var(--teal-deep);
+  }
+  .stat .label{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:4px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+  }
+
+  /* ---- Section ---- */
+  section{margin:48px 0;}
+  .section-title{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .section-title .tag{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--teal-deep);
+    border:1px solid var(--teal-deep);
+    padding:2px 7px;
+    border-radius:2px;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+  }
+  .section-title h2{
+    font-family:'Source Serif 4', serif;
+    font-size:22px;
+    font-weight:600;
+    margin:0;
+  }
+  p.lead{color:var(--ink-soft); max-width:680px; font-size:14.5px;}
+
+  .grid-2{display:grid; grid-template-columns:1.1fr 1fr; gap:28px;}
+  @media (max-width:800px){.grid-2{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    padding:20px;
+  }
+  canvas{max-height:260px;}
+
+  /* ---- Hand-built charts (no external libs) ---- */
+  .chart-title{font-size:13px; font-weight:600; color:var(--ink); margin-bottom:14px;}
+  .bar-chart{display:flex; flex-direction:column; gap:10px;}
+  .bar-row{display:grid; grid-template-columns:110px 1fr 64px; align-items:center; gap:10px;}
+  .bar-row .bname{font-size:12.5px; color:var(--ink-soft); text-align:right;}
+  .bar-track{background:var(--line-soft); height:16px; position:relative; overflow:hidden;}
+  .bar-fill{background:var(--teal); height:100%;}
+  .bar-fill.soft{background:#8FC4B8;}
+  .bar-row .bval{font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--ink-soft);}
+  .hbar-chart .bar-row{grid-template-columns:90px 1fr 50px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  th,td{text-align:left; padding:7px 8px; border-bottom:1px solid var(--line-soft);}
+  th{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); font-weight:500;}
+
+  /* ---- Signature: data quality stamp ---- */
+  .flag{
+    border:2px solid var(--rust);
+    background:#FBEFE9;
+    padding:24px 26px;
+    position:relative;
+    margin:20px 0 8px;
+  }
+  .flag::before{
+    content:"AUDIT FLAG";
+    position:absolute;
+    top:-11px; left:20px;
+    background:var(--rust);
+    color:#fff;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    padding:3px 9px;
+  }
+  .flag h3{
+    font-family:'Source Serif 4', serif;
+    margin:6px 0 8px;
+    font-size:19px;
+    color:var(--rust);
+  }
+  .flag p{margin:0 0 10px; font-size:14.5px; color:var(--ink);}
+  .flag .compare{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-top:14px;
+  }
+  .compare .col{background:#fff; border:1px solid var(--line); padding:12px 14px;}
+  .compare .col .k{font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; color:var(--ink-soft);}
+  .compare .col .v{font-family:'Source Serif 4', serif; font-weight:600; font-size:17px; margin-top:2px;}
+  @media (max-width:700px){.flag .compare{grid-template-columns:1fr;}}
+
+  /* ---- Query cards ---- */
+  .query-card{
+    background:var(--ink);
+    color:#EDEAE0;
+    padding:16px 18px;
+    margin-bottom:12px;
+    border-left:3px solid var(--teal);
+  }
+  .query-card .qn{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:#9FD8C7;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .query-card .qtitle{font-size:14px; margin:4px 0 8px; color:#fff;}
+  .query-card pre{
+    margin:0;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    white-space:pre-wrap;
+    color:#C9E4DB;
+    line-height:1.5;
+  }
+
+  footer{
+    border-top:1px solid var(--line);
+    margin-top:60px;
+    padding:22px 0 40px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  footer a{color:var(--teal-deep);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="chart-meta">
+      <div class="id">Record No. HN-2026-01 &nbsp;·&nbsp; Network Audit</div>
+      <div class="id">100 records &nbsp;·&nbsp; 10 hospitals &nbsp;·&nbsp; 10 cities</div>
+    </div>
+    <h1>Hospital Network Data Analysis</h1>
+    <p class="subhead">A SQL audit of patient volume, staffing, and medical expenses across a 10-hospital network — including a data quality issue found and corrected along the way.</p>
+    <div class="fields">
+      <span>Engine: <b>PostgreSQL</b></span>
+      <span>Method: <b>Aggregation · GROUP BY · Date Arithmetic</b></span>
+      <span>Records reviewed: <b>100</b></span>
+      <span>Records flagged: <b>26</b></span>
+    </div>
+  </header>
+
+  <div class="stat-row">
+    <div class="stat"><div class="num">9,347</div><div class="label">Total Patients Treated</div></div>
+    <div class="stat"><div class="num">₹352,178</div><div class="label">Top Hospital Spend — Healing Touch</div></div>
+    <div class="stat"><div class="num">Urology</div><div class="label">Highest-Volume Department</div></div>
+    <div class="stat"><div class="num">26%</div><div class="label">Records With Bad Date Data</div></div>
+  </div>
+
+  <section>
+    <div class="section-title"><span class="tag">Finding 01</span><h2>Patient Load, By Department & City</h2></div>
+    <p class="lead">Urology, Neurology, and ENT carry the heaviest patient volume network-wide — the priority departments for staffing. Demand is also unevenly spread across cities, with a 3.5× gap between the busiest and quietest.</p>
+    <div class="grid-2">
+      <div class="card">
+        <div class="chart-title">Top 3 Departments by Patient Volume</div>
+        <div class="bar-chart" id="deptChart"></div>
+      </div>
+      <div class="card">
+        <div class="chart-title">Patients Treated by City</div>
+        <div class="bar-chart hbar-chart" id="cityChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span class="tag">Finding 02</span><h2>Where The Money Goes</h2></div>
+    <p class="lead">Monthly medical expenses swing between ~₹98K (April) and ~₹347K (December), with no single runaway month. Healing Touch is the highest-spending hospital network-wide.</p>
+    <div class="grid-2">
+      <div class="card">
+        <div class="chart-title">2023 Monthly Medical Expenses</div>
+        <svg id="monthChart" viewBox="0 0 460 220" style="width:100%; height:auto;"></svg>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Metric</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Highest total expenses</td><td>Healing Touch — ₹352,178.06</td></tr>
+            <tr><td>Lowest-volume department</td><td>Cardiology</td></tr>
+            <tr><td>Highest-volume city</td><td>Jaipur — 1,505 patients</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span class="tag">Finding 03</span><h2>The Data Had A Bug — Here's What Changed</h2></div>
+    <div class="flag">
+      <h3>26 of 100 records have a Discharge Date before the Admission Date</h3>
+      <p>Almost certainly a data-entry error, not a real event. Left unhandled, it silently breaks every stay-length and per-day-expense calculation — because a negative stay length inflates or inverts the ratio it's used in.</p>
+      <div class="compare">
+        <div class="col">
+          <div class="k">Raw query result</div>
+          <div class="v">City Hospital — ₹347,988 / day</div>
+        </div>
+        <div class="col">
+          <div class="k">After excluding bad rows</div>
+          <div class="v">Fortis Care — ₹1,081 / day</div>
+        </div>
+      </div>
+      <p style="margin-top:14px;">The "most expensive hospital per patient-day" answer flips entirely once the 26 flawed rows are excluded — a reminder that an unaudited query can point a real decision in the wrong direction.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title"><span class="tag">Method</span><h2>How It Was Queried</h2></div>
+    <p class="lead">A sample of the SQL behind these findings — all 10 assignment queries in full are in the repo.</p>
+
+    <div class="query-card">
+      <div class="qn">Query — Data Quality Check</div>
+      <div class="qtitle">Detect invalid admission/discharge pairs</div>
+      <pre>SELECT COUNT(*) AS invalid_stay_rows
+FROM hospital_records
+WHERE discharge_date - admission_date &lt; 0;
+-- Result: 26 rows</pre>
+    </div>
+
+    <div class="query-card">
+      <div class="qn">Query 3 — Core Assignment</div>
+      <div class="qtitle">Top 3 departments by patient volume</div>
+      <pre>SELECT department, SUM(patients_count) AS total_patients
+FROM hospital_records
+GROUP BY department
+ORDER BY total_patients DESC
+LIMIT 3;</pre>
+    </div>
+
+    <div class="query-card">
+      <div class="qn">Query 5 — Core Assignment</div>
+      <div class="qtitle">Average medical expense per day, per hospital (valid stays only)</div>
+      <pre>SELECT hospital_name,
+       SUM(medical_expenses) / SUM(discharge_date - admission_date) AS avg_expense_per_day
+FROM hospital_records
+WHERE discharge_date - admission_date >= 0
+GROUP BY hospital_name
+ORDER BY avg_expense_per_day DESC;</pre>
+    </div>
+  </section>
+
+  <footer>
+    <span>Built as a self-directed extension of a SQL practice dataset.</span>
+    <span><a href="https://github.com/Tejas1707-bit" target="_blank">GitHub — Tejas1707-bit</a></span>
+  </footer>
+</div>
+
+<script>
+  // ---- No external chart library: bars are plain divs, the trend line is hand-drawn SVG ----
+
+  function renderBars(containerId, data, fillClass) {
+    const max = Math.max(...data.map(d => d.value));
+    const el = document.getElementById(containerId);
+    el.innerHTML = data.map(d => `
+      <div class="bar-row">
+        <div class="bname">${d.label}</div>
+        <div class="bar-track"><div class="bar-fill ${fillClass || ''}" style="width:${(d.value / max * 100).toFixed(1)}%"></div></div>
+        <div class="bval">${d.value.toLocaleString()}</div>
+      </div>
+    `).join('');
+  }
+
+  renderBars('deptChart', [
+    { label: 'Urology', value: 1766 },
+    { label: 'Neurology', value: 1229 },
+    { label: 'ENT', value: 1064 }
+  ]);
+
+  renderBars('cityChart', [
+    { label: 'Jaipur', value: 1505 }, { label: 'Ahmedabad', value: 1467 },
+    { label: 'Lucknow', value: 1264 }, { label: 'Hyderabad', value: 1261 },
+    { label: 'Bangalore', value: 955 }, { label: 'Chennai', value: 840 },
+    { label: 'Kolkata', value: 596 }, { label: 'Pune', value: 555 },
+    { label: 'Mumbai', value: 483 }, { label: 'Delhi', value: 421 }
+  ], 'soft');
+
+  // Hand-drawn SVG line chart — no dependencies
+  (function renderMonthChart() {
+    const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const values = [326815,160042,178619,98315,246632,188386,198371,155592,327154,257260,232865,347259];
+    const svg = document.getElementById('monthChart');
+    const W = 460, H = 220, padL = 44, padR = 12, padT = 14, padB = 26;
+    const max = Math.max(...values), min = 0;
+    const x = i => padL + (i / (values.length - 1)) * (W - padL - padR);
+    const y = v => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+
+    let gridLines = '';
+    for (let g = 0; g <= 4; g++) {
+      const gy = padT + (g / 4) * (H - padT - padB);
+      const val = Math.round(max - (g / 4) * max);
+      gridLines += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="#DAD3BE" stroke-width="1"/>`;
+      gridLines += `<text x="${padL - 6}" y="${gy + 3}" font-size="9" fill="#4A5A58" text-anchor="end" font-family="IBM Plex Mono, monospace">${(val/1000).toFixed(0)}k</text>`;
+    }
+
+    const points = values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+    const areaPoints = `${padL},${y(0)} ${points} ${W - padR},${y(0)}`;
+
+    const dots = values.map((v, i) =>
+      `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="#B3492E"/>`
+    ).join('');
+
+    const xLabels = labels.map((l, i) =>
+      `<text x="${x(i)}" y="${H - 6}" font-size="9" fill="#4A5A58" text-anchor="middle" font-family="IBM Plex Mono, monospace">${l}</text>`
+    ).join('');
+
+    svg.innerHTML = `
+      ${gridLines}
+      <polygon points="${areaPoints}" fill="rgba(179,73,46,0.08)"/>
+      <polyline points="${points}" fill="none" stroke="#B3492E" stroke-width="2"/>
+      ${dots}
+      ${xLabels}
+    `;
+  })();
+
+</script>
+</body>
+</html>
